@@ -4,3 +4,7 @@ nibabel==4.0.1
 tensorflow==2.15.0
 scikit-image==0.21.0
 hd-bet==1.1.14
+rich==14.2.0
+markdown-it-py==4.0.0
+mdurl==0.1.2
+pygments==2.19.2
