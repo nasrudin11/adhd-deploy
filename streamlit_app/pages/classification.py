@@ -52,44 +52,45 @@ uploaded = st.file_uploader(
     type=["nii", "nii.gz"]
 )
 
-        # =========================
-        # Prediction
-        # =========================
-        prob_tdc = float(model.predict(X)[0][0])
-        prob_adhd = 1.0 - prob_tdc
+# =========================
+# Prediction
+# =========================
+prob_tdc = float(model.predict(X)[0][0])
+prob_adhd = 1.0 - prob_tdc
 
-        # =========================
-        # Probability Section
-        # =========================
-        st.subheader("📊 Probabilitas Kelas (Sigmoid Output)")
+# =========================
+# Probability Section
+# =========================
+st.subheader("📊 Probabilitas Kelas (Sigmoid Output)")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**TDC (Typical Development Control)**")
-            st.progress(prob_tdc)
-            st.caption(f"{prob_tdc:.4f}")
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("**TDC (Typical Development Control)**")
+    st.progress(prob_tdc)
+    st.caption(f"{prob_tdc:.4f}")
 
-        with col2:
-            st.markdown("**ADHD**")
-            st.progress(prob_adhd)
-            st.caption(f"{prob_adhd:.4f}")
+with col2:
+    st.markdown("**ADHD**")
+    st.progress(prob_adhd)
+    st.caption(f"{prob_adhd:.4f}")
 
-        # =========================
-        # Classification Result
-        # =========================
-        st.subheader("🔍 Hasil Klasifikasi")
+# =========================
+# Classification Result
+# =========================
+st.subheader("🔍 Hasil Klasifikasi")
 
-        if prob_tdc >= 0.5:
-            st.success(
-                f"🟢 **TDC (Typhical Developing Children)** terdeteksi\n\n"
-                f"Probabilitas TDC = **{prob_tdc:.4f}**"
-            )
-        else:
-            st.warning(
-                f"🟠 **ADHD (Attention Deficit Hyperactive Disorder)** terdeteksi\n\n"
-                f"Probabilitas ADHD = **{prob_adhd:.4f}**"
-            )
+if prob_tdc >= 0.5:
+    st.success(
+        f"🟢 **TDC (Typhical Developing Children)** terdeteksi\n\n"
+        f"Probabilitas TDC = **{prob_tdc:.4f}**"
+    )
+else:
+    st.warning(
+        f"🟠 **ADHD (Attention Deficit Hyperactive Disorder)** terdeteksi\n\n"
+        f"Probabilitas ADHD = **{prob_adhd:.4f}**"
+    )
 
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+finally:
+if os.path.exists(temp_path):
+    os.remove(temp_path)
+
