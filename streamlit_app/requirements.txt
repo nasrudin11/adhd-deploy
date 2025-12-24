@@ -1,20 +1,7 @@
-# Streamlit app
 streamlit==1.28.1
-
-# Numerical computing
 numpy==1.26.4
-
-# MRI / NIfTI processing
 nibabel==4.0.1
-
-# 3D CNN / deep learning
-tensorflow==2.15.0
-
-# Image processing
 scikit-image==0.21.0
-
-# Brain extraction (HD-BET)
+tensorflow==2.15.0
 hd-bet==2.0.1
-
-
-
+matplotlib==3.9.0
