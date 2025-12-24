@@ -10,7 +10,7 @@ from tensorflow.keras.layers import (
     Multiply, Add, Reshape, Lambda, Concatenate, Conv3D
 )
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "model_3dcnn.h5")
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "model_3dcnn.h5")
 
 # =========================
 # Load Model
@@ -108,4 +108,5 @@ if uploaded is not None:
         # =========================
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
 
