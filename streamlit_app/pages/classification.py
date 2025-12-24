@@ -17,7 +17,7 @@ MODEL_PATH = os.path.join(BASE_DIR, "models", "model_3dcnn.h5")
 # =========================
 @st.cache_resource
 def load_model_3d():
-    return load_model(model_3dcnn.h5, compile=False)
+    return load_model(MODEL_PATH, compile=False)
 
 model = load_model_3d()
 
@@ -108,6 +108,7 @@ if uploaded is not None:
         # =========================
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
 
 
 
