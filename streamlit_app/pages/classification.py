@@ -1,3 +1,6 @@
+# =========================
+# IMPORTS
+# =========================
 import streamlit as st
 import numpy as np
 import nibabel as nib
@@ -6,25 +9,24 @@ import os
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import (
-    GlobalAveragePooling3D, GlobalMaxPooling3D, Dense,
-    Multiply, Add, Reshape, Lambda, Concatenate, Conv3D
+    Conv3D, Dense, GlobalAveragePooling3D, GlobalMaxPooling3D,
+    Reshape, Add, Multiply, Concatenate, Activation, BatchNormalization, ReLU
 )
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "models", "model_3dcnn.h5")
 # =========================
-# Load Model
+# LOAD MODEL
 # =========================
 @st.cache_resource
 def load_model_3d():
-    return load_model(MODEL_PATH, compile=False)
+    # Custom layer sudah diregister, aman load tanpa custom_objects
+    return load_model("models/model_3dcnn.keras", compile=False)
 
 model = load_model_3d()
 
 # =========================
-# Preprocess MRI
+# PREPROCESS MRI
 # =========================
-def preprocess_mri(path, target_shape=(128, 128, 128)):
+def preprocess_mri(path, target_shape=(128,128,128)):
     vol = nib.load(path).get_fdata()
 
     if vol.shape != target_shape:
@@ -39,14 +41,15 @@ def preprocess_mri(path, target_shape=(128, 128, 128)):
     vol_norm = (vol - vol.min()) / (vol.max() - vol.min() + 1e-8)
     vol_norm = vol_norm.astype(np.float32)
 
-    vol_input = np.expand_dims(vol_norm, axis=-1)  # add channel
-    vol_input = np.expand_dims(vol_input, axis=0)  # add batch
+    vol_input = np.expand_dims(vol_norm, axis=-1)  # (128,128,128,1)
+    vol_input = np.expand_dims(vol_input, axis=0)  # (1,128,128,128,1)
 
     return vol_input, vol_norm
 
 # =========================
-# Streamlit UI
+# STREAMLIT APP
 # =========================
+st.set_page_config(page_title="3D MRI ADHD Classification", layout="wide")
 st.title("🧠 3D MRI ADHD Classification")
 
 uploaded = st.file_uploader(
@@ -56,26 +59,18 @@ uploaded = st.file_uploader(
 
 if uploaded is not None:
     temp_path = f"temp_{uploaded.name}"
-    
-    # Simpan file sementara
     with open(temp_path, "wb") as f:
         f.write(uploaded.getbuffer())
-    
+
     try:
-        # =========================
-        # Preprocess
-        # =========================
-        X, vol_norm = preprocess_mri(temp_path)
-        
-        # =========================
+        vol_input, vol_norm = preprocess_mri(temp_path)
+
         # Prediction
-        # =========================
-        prob_tdc = float(model.predict(X)[0][0])
-        prob_adhd = 1.0 - prob_tdc
-        
-        # =========================
-        # Probability Section
-        # =========================
+        with st.spinner("Memproses MRI..."):
+            prob_tdc = float(model.predict(vol_input)[0][0])
+            prob_adhd = 1.0 - prob_tdc
+
+        # Probability section
         st.subheader("📊 Probabilitas Kelas (Sigmoid Output)")
         col1, col2 = st.columns(2)
         with col1:
@@ -86,31 +81,17 @@ if uploaded is not None:
             st.markdown("**ADHD**")
             st.progress(prob_adhd)
             st.caption(f"{prob_adhd:.4f}")
-        
-        # =========================
-        # Classification Result
-        # =========================
+
+        # Classification result
         st.subheader("🔍 Hasil Klasifikasi")
         if prob_tdc >= 0.5:
-            st.success(
-                f"🟢 **TDC (Typical Developing Children)** terdeteksi\n\n"
-                f"Probabilitas TDC = **{prob_tdc:.4f}**"
-            )
+            st.success(f"🟢 **TDC (Typical Developing Children)** terdeteksi\nProbabilitas TDC = **{prob_tdc:.4f}**")
         else:
-            st.warning(
-                f"🟠 **ADHD (Attention Deficit Hyperactive Disorder)** terdeteksi\n\n"
-                f"Probabilitas ADHD = **{prob_adhd:.4f}**"
-            )
-        
+            st.warning(f"🟠 **ADHD (Attention Deficit Hyperactive Disorder)** terdeteksi\nProbabilitas ADHD = **{prob_adhd:.4f}**")
+
+    except Exception as e:
+        st.error(f"Error saat memproses MRI: {e}")
+
     finally:
-        # =========================
-        # Hapus file sementara
-        # =========================
         if os.path.exists(temp_path):
             os.remove(temp_path)
-
-
-
-
-
-
