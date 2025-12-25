@@ -19,7 +19,7 @@ from tensorflow.keras.layers import (
 @st.cache_resource
 def load_model_3d():
     # Custom layer sudah diregister, aman load tanpa custom_objects
-    return load_model("models/model_3dcnn.keras", compile=False)
+    return load_model("../models/model_3dcnn.keras", compile=False)
 
 model = load_model_3d()
 
@@ -95,3 +95,4 @@ if uploaded is not None:
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
