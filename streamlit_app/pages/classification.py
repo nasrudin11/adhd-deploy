@@ -12,18 +12,32 @@ from tensorflow.keras.layers import (
     Conv3D, Dense, GlobalAveragePooling3D, GlobalMaxPooling3D,
     Reshape, Add, Multiply, Concatenate, Activation, BatchNormalization, ReLU
 )
+from tensorflow.keras.utils import register_keras_serializable
 
+@register_keras_serializable()
+class ChannelPool3D(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(ChannelPool3D, self).__init__(**kwargs)
+
+    def call(self, x):
+        avg_pool = tf.reduce_mean(x, axis=-1, keepdims=True)
+        max_pool = tf.reduce_max(x, axis=-1, keepdims=True)
+        return tf.concat([avg_pool, max_pool], axis=-1)
 # =========================
 # LOAD MODEL
 # =========================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(BASE_DIR, "models", "model_3dcnn2.h5")
+MODEL_PATH = os.path.join(BASE_DIR, "models", "model_3dcnn2.keras")
 
 @st.cache_resource
 def load_model_3d():
-    return tf.keras.models.load_model(
-        MODEL_PATH,
-        compile=False
+    # Custom layer sudah diregister, aman load tanpa custom_objects
+    return load_model(
+            MODEL_PATH,
+            custom_objects={
+                "ChannelPool3D": ChannelPool3D
+            }
+
     )
 
 model = load_model_3d()
@@ -100,6 +114,7 @@ if uploaded is not None:
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
 
 
 
