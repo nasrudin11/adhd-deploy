@@ -16,13 +16,12 @@ from tensorflow.keras.layers import (
 # =========================
 # LOAD MODEL
 # =========================
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(BASE_DIR, "models", "model.h5")
+
 
 @st.cache_resource
 def load_model_3d():
     # Custom layer sudah diregister, aman load tanpa custom_objects
-    return load_model("MODEL_PATH", compile=False)
+    return load_model("models/model_3dcnn.keras", compile=False)
 
 model = load_model_3d()
 
@@ -98,5 +97,6 @@ if uploaded is not None:
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
 
 
