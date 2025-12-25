@@ -1,6 +1,12 @@
 import streamlit as st
 
-# Hapus padding kolom agar gambar lebih menempel
+# WAJIB PALING ATAS
+st.set_page_config(
+    page_title="3D CNN Model",
+    layout="wide"
+)
+
+# BARU SETELAH ITU BOLEH ADA KODE LAIN
 st.markdown("""
 <style>
 .block-container .stColumn {
@@ -10,12 +16,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.set_page_config(page_title="3D CNN Model", layout="wide")
 st.title("🧠 3D CNN, Dilated Convolution, dan CBAM untuk Klasifikasi MRI ADHD")
 
 st.markdown("""
-Model ini menggunakan pendekatan **3D Convolutional Neural Network (3D CNN)** untuk memproses citra MRI 3D secara utuh. Dengan 3D CNN, model dapat mengekstraksi fitur volumetrik yang relevan dari otak, berbeda dengan CNN 2D yang hanya memproses slice individual. Setiap blok Conv3D diikuti normalisasi batch, fungsi aktivasi ReLU, dan pooling untuk menyoroti fitur penting serta mengurangi dimensi spasial.
+Model ini menggunakan pendekatan **3D Convolutional Neural Network (3D CNN)** untuk memproses citra MRI 3D secara utuh.
 """)
+
 
 # --- 3D CNN ---
 col1, col2 = st.columns([1,1])
@@ -62,3 +68,4 @@ with col2:
 st.markdown("""
 ✨ Dengan kombinasi **3D CNN**, **Dilated Convolution**, dan **CBAM**, model mampu mengekstraksi fitur volumetrik otak yang relevan, menangkap konteks global, serta fokus pada saluran dan lokasi penting. Hal ini membuat klasifikasi MRI ADHD lebih akurat dan interaktif bagi pengguna.
 """)
+
