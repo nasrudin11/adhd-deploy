@@ -17,7 +17,7 @@ from tensorflow.keras.layers import (
 # LOAD MODEL
 # =========================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(BASE_DIR, "models", "model_3dcnn2.keras")
+MODEL_PATH = os.path.join(BASE_DIR, "models", "model_3dcnn2.h5")
 
 @st.cache_resource
 def load_model_3d():
@@ -100,6 +100,7 @@ if uploaded is not None:
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
 
 
 
