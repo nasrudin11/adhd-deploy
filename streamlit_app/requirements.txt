@@ -1,7 +1,6 @@
-tensorflow
-keras
+tensorflow==2.18.0
+keras==3.8.0
 numpy
 scikit-image
 nibabel
 streamlit
-
