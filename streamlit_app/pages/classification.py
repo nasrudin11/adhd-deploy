@@ -5,13 +5,10 @@ import streamlit as st
 import numpy as np
 import nibabel as nib
 from skimage.transform import resize
+import matplotlib.pyplot as plt
 import os
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-from tensorflow.keras.layers import (
-    Conv3D, Dense, GlobalAveragePooling3D, GlobalMaxPooling3D,
-    Reshape, Add, Multiply, Concatenate, Activation, BatchNormalization, ReLU
-)
 from tensorflow.keras.utils import register_keras_serializable
 
 @register_keras_serializable()
@@ -24,12 +21,6 @@ class ChannelPool3D(tf.keras.layers.Layer):
         max_pool = tf.reduce_max(x, axis=-1, keepdims=True)
         return tf.concat([avg_pool, max_pool], axis=-1)
 
-import tensorflow as tf
-import keras
-import streamlit as st
-
-st.write("TF:", tf.__version__)
-st.write("Keras:", keras.__version__)
 # =========================
 # LOAD MODEL
 # =========================
@@ -51,38 +42,66 @@ model = load_model_3d()
 
 
 # =========================
-# PREPROCESS MRI
+# CROPPING & PADDING FUNCTIONS
+# =========================
+def crop_to_brain_bbox(vol, margin=5):
+    coords = np.where(vol > 0)
+    if len(coords[0]) == 0:
+        return vol
+    z_min, z_max = coords[0].min(), coords[0].max()
+    y_min, y_max = coords[1].min(), coords[1].max()
+    x_min, x_max = coords[2].min(), coords[2].max()
+    z_min, y_min, x_min = max(0, z_min - margin), max(0, y_min - margin), max(0, x_min - margin)
+    z_max, y_max, x_max = min(vol.shape[0], z_max + margin), min(vol.shape[1], y_max + margin), min(vol.shape[2], x_max + margin)
+    return vol[z_min:z_max, y_min:y_max, x_min:x_max]
+
+def crop_or_pad_depth(vol, target=128):
+    D = vol.shape[0]
+    if D > target:
+        cut_total = D - target
+        cut_before = cut_total // 2
+        cut_after = cut_total - cut_before
+        vol = vol[cut_before:D - cut_after]
+    elif D < target:
+        pad_total = target - D
+        pad_before = pad_total // 2
+        pad_after = pad_total - pad_before
+        vol = np.pad(vol, ((pad_before, pad_after), (0, 0), (0, 0)), mode="constant")
+    return vol
+
+# =========================
+# FULL PREPROCESS FUNCTION
 # =========================
 def preprocess_mri(path, target_shape=(128,128,128)):
-    vol = nib.load(path).get_fdata()
+    vol_raw = nib.load(path).get_fdata().astype(np.float32)  # raw MRI
+    vol = vol_raw.copy()  # untuk preprocessing
 
-    if vol.shape != target_shape:
-        vol = resize(
-            vol,
-            target_shape,
-            order=1,
-            preserve_range=True,
-            anti_aliasing=True
-        )
+    # 1️⃣ Crop ke bounding box otak
+    vol = crop_to_brain_bbox(vol, margin=5)
 
-    vol_norm = (vol - vol.min()) / (vol.max() - vol.min() + 1e-8)
-    vol_norm = vol_norm.astype(np.float32)
+    # 2️⃣ Resize HxW
+    vol = np.stack([resize(vol[i], target_shape[:2], order=1, preserve_range=True, anti_aliasing=True)
+                    for i in range(vol.shape[0])]).astype(np.float32)
 
-    vol_input = np.expand_dims(vol_norm, axis=-1)  # (128,128,128,1)
-    vol_input = np.expand_dims(vol_input, axis=0)  # (1,128,128,128,1)
+    # 3️⃣ Crop / pad depth
+    vol = crop_or_pad_depth(vol, target=target_shape[0])
 
-    return vol_input, vol_norm
+    # 4️⃣ Normalisasi
+    vol = (vol - vol.min()) / (vol.max() - vol.min() + 1e-8)
+
+    # 5️⃣ Untuk model input
+    vol_model = np.expand_dims(np.moveaxis(vol, 0, 2), axis=-1)  # (H,W,D,1)
+    vol_model = np.expand_dims(vol_model, axis=0)  # (1,H,W,D,1)
+
+    return vol_model, vol, vol_raw
 
 # =========================
 # STREAMLIT APP
 # =========================
-st.set_page_config(page_title="3D MRI ADHD Classification", layout="wide")
+st.set_page_config(page_title="3D MRI ADHD Classification", layout="centered")
 st.title("🧠 3D MRI ADHD Classification")
 
-uploaded = st.file_uploader(
-    "Upload MRI (.nii / .nii.gz)",
-    type=["nii", "nii.gz"]
-)
+uploaded = st.file_uploader("Upload MRI (.nii / .nii.gz)", type=["nii", "nii.gz"])
 
 if uploaded is not None:
     temp_path = f"temp_{uploaded.name}"
@@ -90,31 +109,72 @@ if uploaded is not None:
         f.write(uploaded.getbuffer())
 
     try:
-        vol_input, vol_norm = preprocess_mri(temp_path)
+        vol_input, vol_pre, vol_raw = preprocess_mri(temp_path)
 
-        # Prediction
+        # =========================
+        # VISUALISASI RAW MRI
+        # =========================
+        st.subheader("🧩 Visualisasi Raw MRI (Middle Slice)")
+        X, Y, Z = vol_raw.shape
+        axial   = vol_raw[:, :, Z//2]
+        coronal = vol_raw[:, Y//2, :]
+        sagittal= vol_raw[X//2, :, :]
+
+        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+        axes[0].imshow(axial.T, cmap='gray', origin='lower'); axes[0].set_title("Axial"); axes[0].axis('off')
+        axes[1].imshow(coronal.T, cmap='gray', origin='lower'); axes[1].set_title("Coronal"); axes[1].axis('off')
+        axes[2].imshow(sagittal.T, cmap='gray', origin='lower'); axes[2].set_title("Sagittal"); axes[2].axis('off')
+        plt.tight_layout()
+        st.pyplot(fig)
+
+        # =========================
+        # VISUALISASI AFTER CROPPING & RESIZE
+        # =========================
+        st.subheader("🧩 Visualisasi After Bounding Box & Resize")
+        X, Y, Z = vol_pre.shape
+        axial   = vol_pre[:, :, Z//2]
+        coronal = vol_pre[:, Y//2, :]
+        sagittal= vol_pre[X//2, :, :]
+
+        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+        axes[0].imshow(axial.T, cmap='gray', origin='lower'); axes[0].set_title("Axial"); axes[0].axis('off')
+        axes[1].imshow(coronal.T, cmap='gray', origin='lower'); axes[1].set_title("Coronal"); axes[1].axis('off')
+        axes[2].imshow(sagittal.T, cmap='gray', origin='lower'); axes[2].set_title("Sagittal"); axes[2].axis('off')
+        plt.tight_layout()
+        st.pyplot(fig)
+
+        # =========================
+        # PREDIKSI
+        # =========================
         with st.spinner("Memproses MRI..."):
             prob_tdc = float(model.predict(vol_input)[0][0])
             prob_adhd = 1.0 - prob_tdc
 
-        # Probability section
         st.subheader("📊 Probabilitas Kelas (Sigmoid Output)")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**TDC (Typical Development Control)**")
             st.progress(prob_tdc)
-            st.caption(f"{prob_tdc:.4f}")
+            st.caption(f"{prob_tdc:.4f} → Model yakin {prob_tdc*100:.1f}% bahwa ini TDC")
         with col2:
             st.markdown("**ADHD**")
             st.progress(prob_adhd)
-            st.caption(f"{prob_adhd:.4f}")
+            st.caption(f"{prob_adhd:.4f} → Model yakin {prob_adhd*100:.1f}% bahwa ini ADHD")
 
-        # Classification result
         st.subheader("🔍 Hasil Klasifikasi")
-        if prob_tdc >= 0.5:
-            st.success(f"🟢 **TDC (Typical Developing Children)** terdeteksi\nProbabilitas TDC = **{prob_tdc:.4f}**")
+        if prob_tdc >= prob_adhd:
+            st.success(
+                f"🟢 **Prediksi: TDC (Typical Developing Children)**\n"
+                f"Model memprediksi bahwa MRI ini lebih mirip TDC karena probabilitas TDC ({prob_tdc*100:.1f}%) "
+                f"lebih tinggi dibandingkan probabilitas ADHD ({prob_adhd*100:.1f}%)."
+            )
         else:
-            st.warning(f"🟠 **ADHD (Attention Deficit Hyperactive Disorder)** terdeteksi\nProbabilitas ADHD = **{prob_adhd:.4f}**")
+            st.warning(
+                f"🟠 **Prediksi: ADHD (Attention Deficit Hyperactive Disorder)**\n"
+                f"Model memprediksi bahwa MRI ini lebih mirip ADHD karena probabilitas ADHD ({prob_adhd*100:.1f}%) "
+                f"lebih tinggi dibandingkan probabilitas TDC ({prob_tdc*100:.1f}%)."
+            )
+
 
     except Exception as e:
         st.error(f"Error saat memproses MRI: {e}")
@@ -122,6 +182,8 @@ if uploaded is not None:
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+
 
 
 
