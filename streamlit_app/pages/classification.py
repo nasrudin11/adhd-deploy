@@ -6,20 +6,22 @@ import numpy as np
 import nibabel as nib
 from skimage.transform import resize
 import matplotlib.pyplot as plt
+from skimage import measure
+import plotly.graph_objects as go
 import os
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import register_keras_serializable
 
+# =========================
+# CUSTOM LAYER
+# =========================
 @register_keras_serializable()
 class ChannelPool3D(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
-        super(ChannelPool3D, self).__init__(**kwargs)
-
     def call(self, x):
         avg_pool = tf.reduce_mean(x, axis=-1, keepdims=True)
         max_pool = tf.reduce_max(x, axis=-1, keepdims=True)
-        return tf.concat([avg_pool, max_pool], axis=-1)
+        return tf.concat([avg_pool, max_pool], axis=-1)1)
 
 # =========================
 # LOAD MODEL
@@ -112,9 +114,82 @@ if uploaded is not None:
         vol_input, vol_pre, vol_raw = preprocess_mri(temp_path)
 
         # =========================
+        # VISUALISASI 3D - MARCHING CUBES
+        # =========================
+
+        st.subheader("🧊 Visualisasi 3D MRI")
+        st.markdown("""
+        Menampilkan bentuk **3D otak** hasil rekonstruksi menggunakan metode  
+        **Marching Cubes** untuk memberikan gambaran struktur anatomi secara menyeluruh.
+        """)
+
+        # Gunakan volume asli (tanpa downsampling)
+        vol_mc = vol_raw
+
+        # Threshold otomatis untuk menghindari background
+        threshold = np.percentile(vol_mc, 60)
+
+        # Marching Cubes
+        verts, faces, _, _ = measure.marching_cubes(
+            vol_mc,
+            level=threshold
+        )
+
+        # Membuat mesh 3D
+        mesh = go.Mesh3d(
+            # Koordinat x, y, z setiap vertex dari mesh (titik 3D)
+            x=verts[:, 0],
+            y=verts[:, 1],
+            z=verts[:, 2],
+            
+            # Indeks vertex tiap segitiga/face
+            i=faces[:, 0],
+            j=faces[:, 1],
+            k=faces[:, 2],
+            
+            # Warna mesh
+            color='gray',
+            
+            # Transparansi
+            opacity=1,
+            
+            # Pengaturan pencahayaan permukaan mesh
+            lighting=dict(
+                ambient=0.3,   # cahaya global/sekitar
+                diffuse=0.7,   # cahaya dari sumber utama (shading)
+                specular=0.4,  # pantulan cahaya (kilau)
+                roughness=0.6  # kekasaran permukaan (matte vs glossy)
+            )
+        )
+
+
+
+        # Plot
+        # Membuat figure 3D dari mesh yang sudah dibuat
+        fig3d = go.Figure(mesh)
+        # Mengatur layout figure
+        fig3d.update_layout(
+            scene=dict(
+                xaxis=dict(visible=False),
+                yaxis=dict(visible=False),
+                zaxis=dict(visible=False)
+            ),
+            # Mengatur margin figure (kiri, kanan, atas, bawah)
+            margin=dict(l=0, r=0, t=40, b=0)
+        )
+
+        # use_container_width=True → otomatis menyesuaikan lebar figure dengan container Streamlit
+        st.plotly_chart(fig3d, use_container_width=True)
+
+
+        # =========================
         # VISUALISASI RAW MRI
         # =========================
-        st.subheader("🧩 Visualisasi Raw MRI (Middle Slice)")
+        st.subheader("🧩 Visualisasi 2D MRI")
+        st.markdown("""
+        Visualisasi irisan **Axial, Coronal, dan Sagittal** dari citra MRI asli
+        sebelum dilakukan proses resize.
+        """)
         X, Y, Z = vol_raw.shape
         axial   = vol_raw[:, :, Z//2]
         coronal = vol_raw[:, Y//2, :]
@@ -128,9 +203,10 @@ if uploaded is not None:
         st.pyplot(fig)
 
         # =========================
-        # VISUALISASI AFTER CROPPING & RESIZE
+        # VISUALISASI AFTER RESIZE
         # =========================
-        st.subheader("🧩 Visualisasi After Bounding Box & Resize")
+        st.subheader("🧩 Visualisasi Resize")
+        st.markdown(""" Visualisasi hasil setelah dilakukan proses resize image citra MRI """)
         X, Y, Z = vol_pre.shape
         axial   = vol_pre[:, :, Z//2]
         coronal = vol_pre[:, Y//2, :]
@@ -151,6 +227,11 @@ if uploaded is not None:
             prob_adhd = 1.0 - prob_tdc
 
         st.subheader("📊 Probabilitas Kelas (Sigmoid Output)")
+        st.markdown("""
+        Nilai probabilitas menunjukkan **tingkat keyakinan model** terhadap masing-masing kelas.
+        Semakin besar nilainya, semakin tinggi keyakinan model.
+        """)
+        
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**TDC (Typical Development Control)**")
@@ -180,8 +261,9 @@ if uploaded is not None:
         st.error(f"Error saat memproses MRI: {e}")
 
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        if os.path.exists(temp_path): 
+            os.remove(temp_path) 
+
 
 
 
