@@ -22,7 +22,7 @@ class ChannelPool3D(tf.keras.layers.Layer):
         avg_pool = tf.reduce_mean(x, axis=-1, keepdims=True)
         max_pool = tf.reduce_max(x, axis=-1, keepdims=True)
         return tf.concat([avg_pool, max_pool], axis=-1)1)
-
+)
 # =========================
 # LOAD MODEL
 # =========================
@@ -263,6 +263,7 @@ if uploaded is not None:
     finally:
         if os.path.exists(temp_path): 
             os.remove(temp_path) 
+
 
 
 
